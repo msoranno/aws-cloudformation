@@ -1,0 +1,15 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Es para poner lo basico que hace falta para crear un Ec2.",
+  "Resources": {
+    "ec2instance": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": "ami-4e9b8e2a",
+        "KeyName": "ansible",
+        "SubnetId" :"subnet-b75bbdcc",
+        "InstanceType" : "t2.micro"
+      }
+    }
+  }
+}
