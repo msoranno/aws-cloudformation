@@ -1,0 +1,57 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Crear security group y habilita el puerto 22 para entrar por ssh y deja salir por todos",
+    
+    "Parameters" : {
+      "aSgName" : {
+        "Description" : "Nombre que identifique al SG Ej: sg_ec2_001",
+        "Type" : "String",
+        "AllowedPattern" : "[a-zA-Z0-9]*_[a-zA-Z0-9]*"
+      }
+
+    },
+
+    "Mappings" : {
+
+        "sg01" : {
+          "basico" : {
+            "desc"   : "Habilita puerto 22"
+          },
+             
+          "ingress": {"proto" : "tcp", "from" : "22" , "to" : "22" , "rango" : "0.0.0.0/0"}
+        },
+        "sg02" : {
+          "basico" : {
+            "desc"   : "Habilita puerto 22"
+          },
+             
+          "ingress": {"proto" : "tcp", "from" : "22" , "to" : "22" , "rango" : "0.0.0.0/0"}
+        }
+    },
+
+    "Resources" : {
+
+            "InstanceSecurityGroup01" : {
+              "Type" : "AWS::EC2::SecurityGroup",
+              "Properties" : {
+                  "GroupName" : {"Ref" : "aSgName"},
+                  "GroupDescription" : { "Fn::FindInMap" : [ "sg01", "basico", "desc"] },
+                  "SecurityGroupIngress" : [ {
+                    "IpProtocol" : { "Fn::FindInMap" : [ "sg01", "ingress", "proto" ]},
+                    "FromPort" : { "Fn::FindInMap" : [ "sg01", "ingress", "from" ]},
+                    "ToPort" : { "Fn::FindInMap" : [ "sg01", "ingress", "to" ]},
+                    "CidrIp" : { "Fn::FindInMap" : [ "sg01", "ingress", "rango" ] }
+                  } ]
+              }
+            }
+
+    },
+
+    "Outputs" : {
+      "sgI01" : {
+        "Description" : "Sg creado ",
+        "Value" :  { "Fn::Join" : [ "--", [ "Id del security group", { "Fn::GetAtt" : [ "InstanceSecurityGroup01", "GroupId" ]}]]}
+      }
+    }
+ 
+}
