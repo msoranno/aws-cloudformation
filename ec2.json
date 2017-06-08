@@ -1,0 +1,84 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Crear una instancia Ec2 tirando de otro template que crea el Security group.",
+    
+    "Parameters" : {
+
+        "InstanceType" : {
+              "Description" : "WebServer EC2 instance type",
+              "Type" : "String",
+              "Default" : "t2.micro",
+              "AllowedValues" : [ "t2.micro", "t2.small"],
+              "ConstraintDescription" : "must be a valid EC2 instance type."
+        },
+
+        "KeyName": {
+          "Description" : "EC2 KeyPair para habilitar acceso ssh ",
+          "Type": "AWS::EC2::KeyPair::KeyName",
+          "ConstraintDescription" : "listado de key pairs disponibles"
+        }
+    },
+
+    "Mappings" : {
+
+        "AWSInstanceType2Arch" : {
+              "t2.micro"    : { "Arch" : "HVM64"  },
+              "t2.small"    : { "Arch" : "HVM64"  }
+        },
+
+        "AWSRegionArch2AMI" : {
+              "eu-central-1"     : {"PV64" : "ami-6527cf0a", "HVM64" : "ami-b968bad6", "HVMG2" : "ami-81ac71ee"},
+              "otra-region"      : {"PV64" : "NOT_SUPPORTED", "HVM64" : "ami-886369ec", "HVMG2" : "NOT_SUPPORTED"}
+        }
+
+    },
+
+    "Resources" : {
+
+            "EC2Instance" : {
+              "Type" : "AWS::EC2::Instance",
+              "Properties" : {
+                "InstanceType" : { "Ref" : "InstanceType" },
+                "SecurityGroups" : [ { "Ref" : "secGroup" } ],
+                "KeyName" : { "Ref" : "KeyName" },
+                "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                                  { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ]}] 
+                }
+              }
+            },
+     
+
+            "secGroup" : {
+                  "Type" : "AWS::CloudFormation::Stack",
+                    "Properties" : {
+                      "Parameters" : {
+                          "aSgName" : "sg"
+                      },
+                      "TemplateURL" : "file://secGroup.json"
+                    }
+            }
+
+    },
+
+    "Outputs" : {
+
+          "InstanceId" : {
+            "Description" : "InstanceId of the newly created EC2 instance",
+            "Value" : { "Ref" : "EC2Instance" }
+          },
+          "AZ" : {
+            "Description" : "Availability Zone of the newly created EC2 instance",
+            "Value" : { "Fn::GetAtt" : [ "EC2Instance", "AvailabilityZone" ] }
+          },
+          "PublicDNS" : {
+            "Description" : "Public DNSName of the newly created EC2 instance",
+            "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicDnsName" ] }
+          },
+          "PublicIP" : {
+            "Description" : "Public IP address of the newly created EC2 instance",
+            "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicIp" ] }
+          }
+
+    }
+ 
+}
