@@ -239,12 +239,38 @@
             },
 
                 
-            "EC2Host" : {
+            "kubernetesMaster" : {
               "Type" : "AWS::EC2::Instance",
               "DependsOn" : "GatewayToInternet",
               "Metadata" : {
                    "C1": "  Creamos el EC2.",
-                   "C2": "  La idea es que sirva de host bastionado. "
+                   "C2": "  La idea es que sirva de host bastionado. ",
+                   "AWS::CloudFormation::Init" : {
+                              "configSets" : {
+                                "PasosAseguir" : [ "instalaDocker" ]
+                              },
+
+                              "instalaDocker" : {
+                                  "packages" : {
+                                    "yum" : {
+                                      "docker" : []
+                                     }
+                                  },
+                                  "services" :{
+                                      "sysvinit" : {
+                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"}
+                                      }
+
+                                  },
+                                  "commands" : {
+                                          "ec2ToDodckergroup" : {
+                                              "command" : "usermod -a -G docker ec2-user"
+                                          }
+                                  }                               
+                              },
+
+                      
+                   }                   
               },
               "Properties" : {
                 "InstanceType" : { "Ref" : "EC2InstanceType" },
@@ -257,7 +283,20 @@
                   "DeviceIndex"              : "0",
                   "DeleteOnTermination"      : "true",
                   "SubnetId"                 : { "Ref" : "PublicSubnet" }
-                }]
+                }],
+                "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -xe\n",
+                    "yum update -y\n",
+                    "yum install -y aws-cfn-bootstrap\n",
+                    "yum makecache fast\n",
+
+                    "# Install the files and packages from the metadata\n",
+                    "/opt/aws/bin/cfn-init -v ",
+                    "         --stack ", { "Ref" : "AWS::StackName" },
+                    "         --resource kubernetesMaster ",
+                    "         --configsets PasosAseguir ",
+                    "         --region ", { "Ref" : "AWS::Region" }, "\n"
+                ]]}}                
               }
             },
 
@@ -288,7 +327,7 @@
             },
             "DNSName" : {
               "Description" : "DNS Name of the EC2 host",
-              "Value" :  { "Fn::GetAtt" : ["EC2Host", "PublicDnsName"] }
+              "Value" :  { "Fn::GetAtt" : ["kubernetesMaster", "PublicDnsName"] }
             }
     }
  
