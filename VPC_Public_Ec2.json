@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 cuyo securityGroup permite acceso por el 22 y el 5000. 
-  En el Ec2 se instala y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok.",
+  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. 
+  En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok.",
     
     "Parameters" : {
 
@@ -44,7 +44,7 @@
         },
 
         "AWSRegionArch2AMI" : {
-              "eu-central-1"     : {"PV64" : "ami-6527cf0a", "HVM64" : "ami-b968bad6", "HVMG2" : "ami-81ac71ee"},
+              "eu-central-1"     : {"PV64" : "ami-6527cf0a", "HVM64" : "ami-addd7ac2", "HVMG2" : "ami-81ac71ee"},
               "otra-region"      : {"NADA" : "NADA", "NADA" : "NADA", "NADA" : "NADA"}
         }
     },
@@ -296,6 +296,16 @@
                     "yum update -y\n",
                     "yum install -y aws-cfn-bootstrap\n",
                     "yum makecache fast\n",
+                    "yum install -y epel-release\n",
+                    "yum install -y awscli\n",
+
+                    "#--Usaremos la utilidad easy_install que ya viene en la ami del centos que estamos usando para descargarnos la ultima version del \n",
+                    "#-- del paquete aws-cfn-bootstrap\n", 
+                    "/usr/bin/easy_install --script-dir /opt/aws/bin https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+
+                    "#-- Metemos las cosas donde deberian ir segun documentacion de aws\n",
+                    "cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d \n",
+                    "chmod +x /etc/init.d/cfn-hup\n",
 
                     "# Install the files and packages from the metadata\n",
                     "/opt/aws/bin/cfn-init -v ",
