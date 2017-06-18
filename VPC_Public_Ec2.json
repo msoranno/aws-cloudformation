@@ -1,7 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. 
-  En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok.",
+  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok.",
     
     "Parameters" : {
 
@@ -252,19 +251,20 @@
                               },
 
                               "configDockerRepo" : {
-									"files" : {
-										  "/etc/yum.repos.d/docker.repo" : {
-										    "content" : { "Fn::Join" : ["", [
-										      "[dockerrepo]\n",
-										      "name=Docker Repository\n",
-										      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/\n",
-										      "enabled=1\n",
-										      "gpgcheck=1\n",
-										      "gpgkey=https://yum.dockerproject.org/gpg\n"
-										      ]]}
-										  }
+                              	    "files" : {
+										"/etc/yum.repos.d/docker.repo" : {
+											    "content" : { "Fn::Join" : ["", [
+											      "[dockerrepo] \n",
+											      "name=Docker Repository \n",
+											      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
+											      "enabled=1 \n",
+											      "gpgcheck=1 \n",
+											      "gpgkey=https://yum.dockerproject.org/gpg \n"
+											    ]]}
+										}
 									}
-                              }
+
+                              },
 
                               "instalaDocker" : {
                                   "packages" : {
@@ -278,8 +278,9 @@
                                         "docker" : {"enabled" : "true", "ensureRunning" : "true"}
                                       }
 
-                                  },
+                                  }
                               },
+
                               "configura" : {
                                   "commands" : {
                                           "01_ec2ToDodckergroup" : {
@@ -322,7 +323,7 @@
                     "cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d \n",
                     "chmod +x /etc/init.d/cfn-hup\n",
 
-                    " Install the files and packages from the metadata\n",
+                    "#Install the files and packages from the metadata\n",
                     "/opt/aws/bin/cfn-init -v ",
                     "         --stack ", { "Ref" : "AWS::StackName" },
                     "         --resource kubernetesMaster ",
@@ -350,7 +351,7 @@
                   "ToPort" : "5000",
                   "CidrIp" : "0.0.0.0/0"
                   } 
-                ],
+                ]
 
               }
             }
