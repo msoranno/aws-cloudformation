@@ -248,13 +248,28 @@
                    "C2": "  La idea es que sirva de host bastionado. ",
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
-                                "PasosAseguir" : [ "instalaDocker", "configura" ]
+                                "PasosAseguir" : [ "configDockerRepo", "instalaDocker", "configura" ]
                               },
+
+                              "configDockerRepo" : {
+									"files" : {
+										  "/etc/yum.repos.d/docker.repo" : {
+										    "content" : { "Fn::Join" : ["", [
+										      "[dockerrepo]\n",
+										      "name=Docker Repository\n",
+										      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/\n",
+										      "enabled=1\n",
+										      "gpgcheck=1\n",
+										      "gpgkey=https://yum.dockerproject.org/gpg\n"
+										      ]]}
+										  }
+									}
+                              }
 
                               "instalaDocker" : {
                                   "packages" : {
                                     "yum" : {
-                                      "docker" : [],
+                                      "docker-engine" : [],
                                       "git" : []
                                      }
                                   },
@@ -268,7 +283,7 @@
                               "configura" : {
                                   "commands" : {
                                           "01_ec2ToDodckergroup" : {
-                                              "command" : "usermod -a -G docker ec2-user"
+                                              "command" : "usermod -a -G docker centos"
                                           },
                                           "02_downloadHelContainer" : {
                                               "command" : "docker run -d -p 5000:5000 training/webapp:latest python app.py"
@@ -294,7 +309,7 @@
                 "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
                     "#!/bin/bash -xe\n",
                     "yum update -y\n",
-                    "yum install -y aws-cfn-bootstrap\n",
+                    "#-- Necesita epel yum install -y aws-cfn-bootstrap\n",
                     "yum makecache fast\n",
                     "yum install -y epel-release\n",
                     "yum install -y awscli\n",
@@ -307,7 +322,7 @@
                     "cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d \n",
                     "chmod +x /etc/init.d/cfn-hup\n",
 
-                    "# Install the files and packages from the metadata\n",
+                    " Install the files and packages from the metadata\n",
                     "/opt/aws/bin/cfn-init -v ",
                     "         --stack ", { "Ref" : "AWS::StackName" },
                     "         --resource kubernetesMaster ",
