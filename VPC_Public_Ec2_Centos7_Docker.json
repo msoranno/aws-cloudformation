@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok.",
+  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok. Tambien se crea un disco EBS de 10G que se autodestruye.",
     
     "Parameters" : {
 
@@ -252,17 +252,17 @@
 
                               "configDockerRepo" : {
                               	    "files" : {
-										"/etc/yum.repos.d/docker.repo" : {
-											    "content" : { "Fn::Join" : ["", [
-											      "[dockerrepo] \n",
-											      "name=Docker Repository \n",
-											      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
-											      "enabled=1 \n",
-											      "gpgcheck=1 \n",
-											      "gpgkey=https://yum.dockerproject.org/gpg \n"
-											    ]]}
-										}
-									}
+                    										"/etc/yum.repos.d/docker.repo" : {
+                    											    "content" : { "Fn::Join" : ["", [
+                    											      "[dockerrepo] \n",
+                    											      "name=Docker Repository \n",
+                    											      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
+                    											      "enabled=1 \n",
+                    											      "gpgcheck=1 \n",
+                    											      "gpgkey=https://yum.dockerproject.org/gpg \n"
+                    											     ]]}
+										                    }
+									                  }
 
                               },
 
@@ -297,6 +297,15 @@
               },
               "Properties" : {
                 "InstanceType" : { "Ref" : "EC2InstanceType" },
+                "BlockDeviceMappings" : [
+                   {
+                      "DeviceName" : "/dev/sda1",
+                      "Ebs" : { 
+                        "VolumeSize" : "10",
+                        "DeleteOnTermination" : "true"
+                      }
+                   }
+                ],                        
                 "KeyName"  : { "Ref" : "KeyName" },
                 "ImageId"  : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
                                  { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "EC2InstanceType" }, "Arch" ] } ] },
