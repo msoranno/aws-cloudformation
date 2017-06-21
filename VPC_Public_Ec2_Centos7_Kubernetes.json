@@ -1,0 +1,384 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) que tenga el Master de Kubernetes. Ademas crear una subred privada en el mismo VPC que tenga un autoscaling group con 2 minions de Kubernetes",
+    
+    "Parameters" : {
+
+        "EC2InstanceType" : {
+              "Description" : "EC2 instance type",
+              "Type" : "String",
+              "Default" : "t2.micro",
+              "AllowedValues" : [ "t2.micro", "t2.small"],
+              "ConstraintDescription" : "must be a valid EC2 instance type."
+        },
+
+        "KeyName": {
+          "Description" : "EC2 KeyPair para habilitar acceso ssh ",
+          "Type": "AWS::EC2::KeyPair::KeyName",
+          "ConstraintDescription" : "listado de key pairs disponibles"
+        },
+
+        "SSHLocation" : {
+          "Description" : "Se puede restringir el acceso (default can be accessed from anywhere)",
+          "Type" : "String",
+          "MinLength": "9",
+          "MaxLength": "18",
+          "Default" : "0.0.0.0/0",
+          "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+          "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
+        }
+
+    },
+
+    "Mappings" : {
+
+        "SubnetConfig" : {
+          "VPC"     : { "CIDR" : "10.0.0.0/16" },
+          "Public"  : { "CIDR" : "10.0.0.0/24" }
+        },
+
+       "AWSInstanceType2Arch" : {
+              "t2.micro"    : { "Arch" : "HVM64"  },
+              "t2.small"    : { "Arch" : "HVM64"  }
+        },
+
+        "AWSRegionArch2AMI" : {
+              "eu-central-1"     : {"PV64" : "ami-6527cf0a", "HVM64" : "ami-addd7ac2", "HVMG2" : "ami-81ac71ee"},
+              "otra-region"      : {"NADA" : "NADA", "NADA" : "NADA", "NADA" : "NADA"}
+        }
+    },
+
+    "Resources" : {
+
+            "VPC" : {
+              "Type" : "AWS::EC2::VPC",
+              "Metadata" : {
+                    "Comment1" : "Creacion del VPC en el rango 10.0.0.0/16"
+              },
+              "Properties" : {
+                "EnableDnsSupport" : "true",
+                "EnableDnsHostnames" : "true",
+                "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]},
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+            "PublicSubnet" : {
+              "Type" : "AWS::EC2::Subnet",
+              "Metadata" : {
+                    "Comment1" :"Creacion de la subnet publica en el rango 10.0.0.0/24",
+                    "Comment2" :"Tira del VPC creado anteriormente.",
+                    "Comment3" :"Como se puede ver no se escoge un AZ especifico. Amazon recomienda dejarselo a el."
+              },
+              "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "Public", "CIDR" ]},
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+
+            "InternetGateway" : {
+              "Type" : "AWS::EC2::InternetGateway",
+              "Metadata" :{
+                    "Comment1" : "Se crea el Gateway y se asocia al VPC"
+              },
+              "Properties" : {
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+            "GatewayToInternet" : {
+               "Type" : "AWS::EC2::VPCGatewayAttachment",
+               "Properties" : {
+                 "VpcId" : { "Ref" : "VPC" },
+                 "InternetGatewayId" : { "Ref" : "InternetGateway" }
+               }
+            },
+
+
+            "PublicRouteTable" : {
+              "Type" : "AWS::EC2::RouteTable",
+              "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+            "PublicRoute" : {
+              "Type" : "AWS::EC2::Route",
+              "DependsOn" : "GatewayToInternet",
+              "Metadata" : {
+                "C1" : "Se crea un Route y un RouteTable",
+                "C2" : "RouteTable -> VPC",
+                "C3" : "Route -> (RouteTable, InternetGateway)"
+              },
+              "Properties" : {
+                "RouteTableId" : { "Ref" : "PublicRouteTable" },
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : { "Ref" : "InternetGateway" }
+              }
+            },
+        
+            "PublicSubnetRouteTableAssociation" : {
+              "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+              "Metadata" : {
+                "C1" : "Asociamos el RouteTable a la subnet publica"
+              },
+              "Properties" : {
+                "SubnetId" : { "Ref" : "PublicSubnet" },
+                "RouteTableId" : { "Ref" : "PublicRouteTable" }
+              }
+            },
+
+              
+            "PublicNetworkAcl" : {
+              "Type" : "AWS::EC2::NetworkAcl",
+              "Metadata" : {
+                   "C1": "  Creamos los ACL para definir el trafico que entra al VPC",
+                   "C2": "  Se crean reglas de Inbound, donde se abren: ",
+                   "C3": "  80, 443, 22 , 1024-65535",
+                   "C4": "  Y outbound para  que pueda salir de todo."
+              },
+              "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+            "InboundHTTPPublicNetworkAclEntry" : {
+              "Type" : "AWS::EC2::NetworkAclEntry",
+              "Properties" : {
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" },
+                "RuleNumber" : "100",
+                "Protocol" : "6",
+                "RuleAction" : "allow",
+                "Egress" : "false",
+                "CidrBlock" : "0.0.0.0/0",
+                "PortRange" : { "From" : "80", "To" : "80" }
+              }
+            },
+
+            "InboundHTTPSPublicNetworkAclEntry" : {
+              "Type" : "AWS::EC2::NetworkAclEntry",
+              "Properties" : {
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" },
+                "RuleNumber" : "101",
+                "Protocol" : "6",
+                "RuleAction" : "allow",
+                "Egress" : "false",
+                "CidrBlock" : "0.0.0.0/0",
+                "PortRange" : { "From" : "443", "To" : "443" }
+              }
+            },
+
+            "InboundSSHPublicNetworkAclEntry" : {
+              "Type" : "AWS::EC2::NetworkAclEntry",
+              "Properties" : {
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" },
+                "RuleNumber" : "102",
+                "Protocol" : "6",
+                "RuleAction" : "allow",
+                "Egress" : "false",
+                "CidrBlock" : { "Ref" : "SSHLocation" },
+                "PortRange" : { "From" : "22", "To" : "22" }
+              }
+            },
+
+            "InboundEphemeralPublicNetworkAclEntry" : {
+              "Type" : "AWS::EC2::NetworkAclEntry",
+              "Properties" : {
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" },
+                "RuleNumber" : "103",
+                "Protocol" : "6",
+                "RuleAction" : "allow",
+                "Egress" : "false",
+                "CidrBlock" : "0.0.0.0/0",
+                "PortRange" : { "From" : "1024", "To" : "65535" }
+              }
+            },
+
+            "OutboundPublicNetworkAclEntry" : {
+              "Type" : "AWS::EC2::NetworkAclEntry",
+              "Properties" : {
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" },
+                "RuleNumber" : "100",
+                "Protocol" : "6",
+                "RuleAction" : "allow",
+                "Egress" : "true",
+                "CidrBlock" : "0.0.0.0/0",
+                "PortRange" : { "From" : "0", "To" : "65535" }
+              }
+            },
+
+        
+            "PublicSubnetNetworkAclAssociation" : {
+              "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+              "Metadata" : {
+                   "C1": "Asociamos  el ACL a la Subnet Publica."
+              },
+              "Properties" : {
+                "SubnetId" : { "Ref" : "PublicSubnet" },
+                "NetworkAclId" : { "Ref" : "PublicNetworkAcl" }
+              }
+            },
+
+                
+            "kubernetesMaster" : {
+              "Type" : "AWS::EC2::Instance",
+              "DependsOn" : "GatewayToInternet",
+              "Metadata" : {
+                   "C1": "  Creamos el EC2.",
+                   "C2": "  La idea es que sirva de host bastionado. ",
+                   "AWS::CloudFormation::Init" : {
+                              "configSets" : {
+                                "PasosAseguir" : [ "configKubernetesRepo", "instalaDocker", "configura" ]
+                              },
+
+                              "configKubernetesRepo" : {
+                              	    "files" : {
+                    										"/etc/yum.repos.d/virt7-docker-common-release.repo" : {
+                    											    "content" : { "Fn::Join" : ["", [
+                    											      "[virt7-docker-common-release] \n",
+                    											      "name=virt7-docker-common-release \n",
+                    											      "baseurl=http://cbs.centos.org/repos/virt7-docker-common-release/x86_64/os \n",
+                    											      "gpgcheck=0 \n"
+                    											     ]]}
+										                    }
+									                  }
+
+                              },
+
+                              "instalaDocker" : {
+                                  "packages" : {
+                                    "yum" : {
+                                      "docker" : [],
+                                      "kubernetes" : [],
+                                      "etcd" : []
+                                     }
+                                  },
+                                  "services" :{
+                                      "sysvinit" : {
+                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"}
+                                      }
+
+                                  }
+                              },
+
+                              "configura" : {
+                                  "commands" : {
+                                          "01_ec2ToDodckergroup" : {
+                                              "command" : "usermod -a -G docker centos"
+                                          },
+                                          "02_downloadHelContainer" : {
+                                              "command" : "docker run -d -p 5000:5000 training/webapp:latest python app.py"
+                                          }
+                                  }                               
+                              }
+
+                      
+                   }                   
+              },
+              "Properties" : {
+                "InstanceType" : { "Ref" : "EC2InstanceType" },
+                "BlockDeviceMappings" : [
+                   {
+                      "DeviceName" : "/dev/sda1",
+                      "Ebs" : { 
+                        "VolumeSize" : "10",
+                        "DeleteOnTermination" : "true"
+                      }
+                   }
+                ],                        
+                "KeyName"  : { "Ref" : "KeyName" },
+                "ImageId"  : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
+                                 { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "EC2InstanceType" }, "Arch" ] } ] },
+                "NetworkInterfaces" : [{
+                  "GroupSet"                 : [{ "Ref" : "EC2SecurityGroup" }],
+                  "AssociatePublicIpAddress" : "true",
+                  "DeviceIndex"              : "0",
+                  "DeleteOnTermination"      : "true",
+                  "SubnetId"                 : { "Ref" : "PublicSubnet" }
+                }],
+                "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -xe\n",
+                    "yum update -y\n",
+                    "#-- Necesita epel yum install -y aws-cfn-bootstrap\n",
+                    "yum makecache fast\n",
+                    "yum install -y epel-release\n",
+                    "yum install -y awscli\n",
+
+                    "#--Usaremos la utilidad easy_install que ya viene en la ami del centos que estamos usando para descargarnos la ultima version del \n",
+                    "#-- del paquete aws-cfn-bootstrap\n", 
+                    "/usr/bin/easy_install --script-dir /opt/aws/bin https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+
+                    "#-- Metemos las cosas donde deberian ir segun documentacion de aws\n",
+                    "cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d \n",
+                    "chmod +x /etc/init.d/cfn-hup\n",
+
+                    "#Install the files and packages from the metadata\n",
+                    "#/opt/aws/bin/cfn-init -v ",
+                    "#         --stack ", { "Ref" : "AWS::StackName" },
+                    "#         --resource kubernetesMaster ",
+                    "#         --configsets PasosAseguir ",
+                    "#         --region ", { "Ref" : "AWS::Region" }, "\n"
+                ]]}}                
+              }
+            },
+
+            "EC2SecurityGroup" : {
+              "Type" : "AWS::EC2::SecurityGroup",
+              "Properties" : {
+                "GroupDescription" : "Enable access to the EC2 host",
+                "VpcId" : { "Ref" : "VPC" },
+                "SecurityGroupIngress" : [ 
+                  { 
+                  "IpProtocol" : "tcp",
+                  "FromPort" : "22",  
+                  "ToPort" : "22",
+                  "CidrIp" : { "Ref" : "SSHLocation" }
+                  },
+                  {
+                  "IpProtocol" : "tcp",
+                  "FromPort" : "5000",  
+                  "ToPort" : "5000",
+                  "CidrIp" : "0.0.0.0/0"
+                  } 
+                ]
+
+              }
+            }
+
+    },
+
+    "Outputs" : {
+            "VPCId" : {
+              "Description" : "VPCId of the newly created VPC",
+              "Value" :  { "Ref" : "VPC" }
+            },
+            "PublicSubnet" : {
+              "Description" : "SubnetId of the public subnet",
+              "Value" :  { "Ref" : "PublicSubnet" }
+            },
+            "DNSName" : {
+              "Description" : "DNS Name of the EC2 host",
+              "Value" :  { "Fn::GetAtt" : ["kubernetesMaster", "PublicDnsName"] }
+            }
+    }
+ 
+}
