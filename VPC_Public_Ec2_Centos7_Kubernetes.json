@@ -34,7 +34,9 @@
 
         "SubnetConfig" : {
           "VPC"     : { "CIDR" : "10.0.0.0/16" },
-          "Public"  : { "CIDR" : "10.0.0.0/24" }
+          "Public"  : { "CIDR" : "10.0.0.0/24" },
+          "Privada"  : { "CIDR" : "10.0.16.0/24" }
+
         },
 
        "AWSInstanceType2Arch" : {
@@ -79,6 +81,23 @@
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
                   { "Key" : "Network", "Value" : "Public" }
+                ]
+              }
+            },
+
+            "PrivateSubnet" : {
+              "Type" : "AWS::EC2::Subnet",
+              "Metadata" : {
+                    "Comment1" :"Creacion de la subnet privada en el rango 10.0.16.0/24",
+                    "Comment2" :"Tira del VPC creado anteriormente.",
+                    "Comment3" :"Como se puede ver no se escoge un AZ especifico. Amazon recomienda dejarselo a el."
+              },
+              "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "Privada", "CIDR" ]},
+                "Tags" : [
+                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+                  { "Key" : "Network", "Value" : "Private" }
                 ]
               }
             },
@@ -243,8 +262,9 @@
               "Type" : "AWS::EC2::Instance",
               "DependsOn" : "GatewayToInternet",
               "Metadata" : {
-                   "C1": "  Creamos el EC2.",
-                   "C2": "  La idea es que sirva de host bastionado. ",
+                   "C1": "Creamos el EC2.",
+                   "C2": "La idea es que sirva de host bastionado. ",
+                   "C3": "Esta maquina sera visible desde fuera. ",
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
                                 "PasosAseguir" : [ "configKubernetesRepo", "instalaDocker", "configura" ]
@@ -362,7 +382,58 @@
                 ]
 
               }
-            }
+            },
+
+
+           "grupoKubernetesMinion" : {
+              "Type" : "AWS::AutoScaling::AutoScalingGroup",
+              "Properties" : {
+                 "AvailabilityZones" : [ { "Fn::GetAtt" : [ "PrivateSubnet" , "AvailabilityZone" ] } ] ,
+                 "VPCZoneIdentifier" : [ { "Ref" : "PrivateSubnet" } ] , 
+                 "LaunchConfigurationName" : { "Ref" : "SimpleConfig" },
+                 "MinSize" : "2",
+                 "MaxSize" : "3",
+                 "DesiredCapacity" : "2"
+              }
+           },
+
+
+           "SimpleConfig" : {
+              "Type" : "AWS::AutoScaling::LaunchConfiguration",
+              "Properties" : {
+                 "KeyName"  : { "Ref" : "KeyName" },
+                 "ImageId"  : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
+                                 { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "EC2InstanceType" }, "Arch" ] } ] },
+                 "SecurityGroups" : [ { "Ref" : "AutoSecurityGroup" } ],
+                 "InstanceType" : "t2.micro",
+                 "BlockDeviceMappings" : [
+                    {
+                       "DeviceName" : "/dev/sda1",
+                       "Ebs" : { 
+                         "VolumeSize" : "10",
+                         "DeleteOnTermination" : "true"
+                       }
+                    }
+                 ]     
+              }
+           },
+
+           "AutoSecurityGroup" : {
+             "Type" : "AWS::EC2::SecurityGroup",
+             "Properties" : {
+               "GroupDescription" : "Permite acceso interno por el 22",
+               "VpcId" : { "Ref" : "VPC" },
+               "SecurityGroupIngress" : [ 
+                 { 
+                 "IpProtocol" : "tcp",
+                 "FromPort" : "22",  
+                 "ToPort" : "22",
+                 "CidrIp" : "0.0.0.0/0"
+                 }
+               ]
+             }
+           }         
+
 
     },
 
