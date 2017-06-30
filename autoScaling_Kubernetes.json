@@ -1,0 +1,66 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Description",
+    
+    "Parameters" : {
+
+    },
+
+    "Mappings" : {
+
+    },
+
+    "Resources" : {
+         "grupoKubernetesMinion" : {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+               "AvailabilityZones" : { "Fn::GetAZs" : ""},
+               "LaunchConfigurationName" : { "Ref" : "SimpleConfig" },
+               "MinSize" : "1",
+               "MaxSize" : "3"
+            }
+         },
+
+         "SimpleConfig" : {
+            "Type" : "AWS::AutoScaling::LaunchConfiguration",
+            "Properties" : {
+               "ImageId" : "ami-addd7ac2",
+               "SecurityGroups" : [ { "Ref" : "AutoSecurityGroup" } ],
+               "InstanceType" : "t2.micro",
+               "BlockDeviceMappings" : [
+                  {
+                     "DeviceName" : "/dev/sda1",
+                     "Ebs" : { 
+                       "VolumeSize" : "10",
+                       "DeleteOnTermination" : "true"
+                     }
+                  }
+               ]     
+            }
+         },
+
+         "AutoSecurityGroup" : {
+           "Type" : "AWS::EC2::SecurityGroup",
+           "Properties" : {
+             "GroupDescription" : "Permite acceso interno por el 22",
+             "VpcId" : { "Ref" : "VPC" },
+             "SecurityGroupIngress" : [ 
+               { 
+               "IpProtocol" : "tcp",
+               "FromPort" : "22",  
+               "ToPort" : "22",
+               "CidrIp" : "0.0.0.0/0"
+               }
+             ]
+           }
+         }         
+
+    },
+
+    "Outputs" : {
+    }
+ 
+}
+
+
+

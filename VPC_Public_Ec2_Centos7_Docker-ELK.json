@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) que tenga el Master de Kubernetes. Ademas crear una subred privada en el mismo VPC que tenga un autoscaling group con 2 minions de Kubernetes",
+  "Description" : "Stack de ELK Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok. Tambien se crea un disco EBS de 10G que se autodestruye.",
     
     "Parameters" : {
 
@@ -34,9 +34,7 @@
 
         "SubnetConfig" : {
           "VPC"     : { "CIDR" : "10.0.0.0/16" },
-          "Public"  : { "CIDR" : "10.0.0.0/24" },
-          "Privada"  : { "CIDR" : "10.0.16.0/24" }
-
+          "Public"  : { "CIDR" : "10.0.0.0/24" }
         },
 
        "AWSInstanceType2Arch" : {
@@ -63,8 +61,7 @@
                 "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "VPC", "CIDR" ]},
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
+                  { "Key" : "Network", "Value" : "Public" }
                 ]
               }
             },
@@ -81,26 +78,7 @@
                 "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "Public", "CIDR" ]},
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
-                ]
-              }
-            },
-
-            "PrivateSubnet" : {
-              "Type" : "AWS::EC2::Subnet",
-              "Metadata" : {
-                    "Comment1" :"Creacion de la subnet privada en el rango 10.0.16.0/24",
-                    "Comment2" :"Tira del VPC creado anteriormente.",
-                    "Comment3" :"Como se puede ver no se escoge un AZ especifico. Amazon recomienda dejarselo a el."
-              },
-              "Properties" : {
-                "VpcId" : { "Ref" : "VPC" },
-                "CidrBlock" : { "Fn::FindInMap" : [ "SubnetConfig", "Privada", "CIDR" ]},
-                "Tags" : [
-                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Private" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
+                  { "Key" : "Network", "Value" : "Public" }
                 ]
               }
             },
@@ -114,8 +92,7 @@
               "Properties" : {
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
+                  { "Key" : "Network", "Value" : "Public" }
                 ]
               }
             },
@@ -135,8 +112,7 @@
                 "VpcId" : { "Ref" : "VPC" },
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
+                  { "Key" : "Network", "Value" : "Public" }
                 ]
               }
             },
@@ -180,8 +156,7 @@
                 "VpcId" : { "Ref" : "VPC" },
                 "Tags" : [
                   { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
+                  { "Key" : "Network", "Value" : "Public" }
                 ]
               }
             },
@@ -268,22 +243,23 @@
               "Type" : "AWS::EC2::Instance",
               "DependsOn" : "GatewayToInternet",
               "Metadata" : {
-                   "C1": "Creamos el EC2.",
-                   "C2": "La idea es que sirva de host bastionado. ",
-                   "C3": "Esta maquina sera visible desde fuera. ",
+                   "C1": "  Creamos el EC2.",
+                   "C2": "  La idea es que sirva de host bastionado. ",
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
-                                "PasosAseguir" : [ "configKubernetesRepo", "instalaDocker", "configura" ]
+                                "PasosAseguir" : [ "configDockerRepo", "instalaDocker", "configura", "pullELKimages" ]
                               },
 
-                              "configKubernetesRepo" : {
+                              "configDockerRepo" : {
                               	    "files" : {
-                    										"/etc/yum.repos.d/virt7-docker-common-release.repo" : {
+                    										"/etc/yum.repos.d/docker.repo" : {
                     											    "content" : { "Fn::Join" : ["", [
-                    											      "[virt7-docker-common-release] \n",
-                    											      "name=virt7-docker-common-release \n",
-                    											      "baseurl=http://cbs.centos.org/repos/virt7-docker-common-release/x86_64/os \n",
-                    											      "gpgcheck=0 \n"
+                    											      "[dockerrepo] \n",
+                    											      "name=Docker Repository \n",
+                    											      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
+                    											      "enabled=1 \n",
+                    											      "gpgcheck=1 \n",
+                    											      "gpgkey=https://yum.dockerproject.org/gpg \n"
                     											     ]]}
 										                    }
 									                  }
@@ -293,9 +269,8 @@
                               "instalaDocker" : {
                                   "packages" : {
                                     "yum" : {
-                                      "docker" : [],
-                                      "kubernetes" : [],
-                                      "etcd" : []
+                                      "docker-engine" : [],
+                                      "git" : []
                                      }
                                   },
                                   "services" :{
@@ -310,10 +285,22 @@
                                   "commands" : {
                                           "01_ec2ToDodckergroup" : {
                                               "command" : "usermod -a -G docker centos"
-                                          },
-                                          "02_downloadHelContainer" : {
-                                              "command" : "docker run -d -p 5000:5000 training/webapp:latest python app.py"
                                           }
+                                  }                               
+                              },
+
+                              "pullELKimages" : {
+                                  "commands" : {
+                                          "01_elastic" : {
+                                              "command" : "docker pull docker.elastic.co/elasticsearch/elasticsearch:5.4.3"
+                                          },
+                                          "02_kibana" : {
+                                              "command" : "docker pull docker.elastic.co/kibana/kibana:5.4.3"
+                                          },
+                                          "03_logstash" : {
+                                              "command" : "docker pull docker.elastic.co/logstash/logstash:5.4.3"
+                                          }
+
                                   }                               
                               }
 
@@ -321,11 +308,6 @@
                    }                   
               },
               "Properties" : {
-                "Tags" : [
-                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
-                ],
                 "InstanceType" : { "Ref" : "EC2InstanceType" },
                 "BlockDeviceMappings" : [
                    {
@@ -363,11 +345,11 @@
                     "chmod +x /etc/init.d/cfn-hup\n",
 
                     "#Install the files and packages from the metadata\n",
-                    "#/opt/aws/bin/cfn-init -v ",
-                    "#         --stack ", { "Ref" : "AWS::StackName" },
-                    "#         --resource kubernetesMaster ",
-                    "#         --configsets PasosAseguir ",
-                    "#         --region ", { "Ref" : "AWS::Region" }, "\n"
+                    "/opt/aws/bin/cfn-init -v ",
+                    "         --stack ", { "Ref" : "AWS::StackName" },
+                    "         --resource kubernetesMaster ",
+                    "         --configsets PasosAseguir ",
+                    "         --region ", { "Ref" : "AWS::Region" }, "\n"
                 ]]}}                
               }
             },
@@ -375,11 +357,6 @@
             "EC2SecurityGroup" : {
               "Type" : "AWS::EC2::SecurityGroup",
               "Properties" : {
-                "Tags" : [
-                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Public" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
-                ],
                 "GroupDescription" : "Enable access to the EC2 host",
                 "VpcId" : { "Ref" : "VPC" },
                 "SecurityGroupIngress" : [ 
@@ -398,63 +375,7 @@
                 ]
 
               }
-            },
-
-
-           "grupoKubernetesMinion" : {
-              "Type" : "AWS::AutoScaling::AutoScalingGroup",
-              "Properties" : {
-                 "AvailabilityZones" : [ { "Fn::GetAtt" : [ "PrivateSubnet" , "AvailabilityZone" ] } ] ,
-                 "VPCZoneIdentifier" : [ { "Ref" : "PrivateSubnet" } ] , 
-                 "LaunchConfigurationName" : { "Ref" : "SimpleConfig" },
-                 "MinSize" : "2",
-                 "MaxSize" : "3",
-                 "DesiredCapacity" : "2"
-              }
-           },
-
-
-           "SimpleConfig" : {
-              "Type" : "AWS::AutoScaling::LaunchConfiguration",
-              "Properties" : {
-                 "KeyName"  : { "Ref" : "KeyName" },
-                 "ImageId"  : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
-                                 { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "EC2InstanceType" }, "Arch" ] } ] },
-                 "SecurityGroups" : [ { "Ref" : "AutoSecurityGroup" } ],
-                 "InstanceType" : "t2.micro",
-                 "BlockDeviceMappings" : [
-                    {
-                       "DeviceName" : "/dev/sda1",
-                       "Ebs" : { 
-                         "VolumeSize" : "10",
-                         "DeleteOnTermination" : "true"
-                       }
-                    }
-                 ]     
-              }
-           },
-
-           "AutoSecurityGroup" : {
-             "Type" : "AWS::EC2::SecurityGroup",
-             "Properties" : {
-                "Tags" : [
-                  { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
-                  { "Key" : "Network", "Value" : "Private" },
-                  { "Key" : "creadopor", "Value" : "maraco" }
-                ],
-               "GroupDescription" : "Permite acceso interno por el 22",
-               "VpcId" : { "Ref" : "VPC" },
-               "SecurityGroupIngress" : [ 
-                 { 
-                 "IpProtocol" : "tcp",
-                 "FromPort" : "22",  
-                 "ToPort" : "22",
-                 "CidrIp" : "0.0.0.0/0"
-                 }
-               ]
-             }
-           }         
-
+            }
 
     },
 
@@ -466,10 +387,6 @@
             "PublicSubnet" : {
               "Description" : "SubnetId of the public subnet",
               "Value" :  { "Ref" : "PublicSubnet" }
-            },
-            "PrivateSubnet" : {
-              "Description" : "SubnetId of the private subnet",
-              "Value" :  { "Ref" : "PrivateSubnet" }
             },
             "DNSName" : {
               "Description" : "DNS Name of the EC2 host",
