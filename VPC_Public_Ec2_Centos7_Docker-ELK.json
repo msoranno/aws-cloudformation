@@ -8,7 +8,7 @@
               "Description" : "EC2 instance type",
               "Type" : "String",
               "Default" : "t2.micro",
-              "AllowedValues" : [ "t2.micro", "t2.small"],
+              "AllowedValues" : [ "t2.micro", "t2.small", "t2.large"],
               "ConstraintDescription" : "must be a valid EC2 instance type."
         },
 
@@ -39,7 +39,8 @@
 
        "AWSInstanceType2Arch" : {
               "t2.micro"    : { "Arch" : "HVM64"  },
-              "t2.small"    : { "Arch" : "HVM64"  }
+              "t2.small"    : { "Arch" : "HVM64"  },
+              "t2.large"    : { "Arch" : "HVM64"  }
         },
 
         "AWSRegionArch2AMI" : {
@@ -213,6 +214,7 @@
               }
             },
 
+
             "OutboundPublicNetworkAclEntry" : {
               "Type" : "AWS::EC2::NetworkAclEntry",
               "Properties" : {
@@ -247,7 +249,7 @@
                    "C2": "  La idea es que sirva de host bastionado. ",
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
-                                "PasosAseguir" : [ "configDockerRepo", "instalaDocker", "configura", "pullELKimages" ]
+                                "PasosAseguir" : [ "configDockerRepo", "instalaApss", "configura", "pullELKimages", "startELK" ]
                               },
 
                               "configDockerRepo" : {
@@ -266,16 +268,21 @@
 
                               },
 
-                              "instalaDocker" : {
+                              "instalaApss" : {
                                   "packages" : {
                                     "yum" : {
                                       "docker-engine" : [],
-                                      "git" : []
+                                      "git" : [],
+                                      "wget" : [],
+                                      "elinks": [],
+                                      "nginx": [],
+                                      "vim": []
                                      }
                                   },
                                   "services" :{
                                       "sysvinit" : {
-                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"}
+                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"},
+                                        "nginx" : {"enabled" : "true", "ensureRunning" : "true"}
                                       }
 
                                   }
@@ -285,6 +292,9 @@
                                   "commands" : {
                                           "01_ec2ToDodckergroup" : {
                                               "command" : "usermod -a -G docker centos"
+                                          },
+                                          "02_ajustaMemoriaElastic" :{
+                                              "command" : "sysctl -w vm.max_map_count=262144"
                                           }
                                   }                               
                               },
@@ -299,6 +309,21 @@
                                           },
                                           "03_logstash" : {
                                               "command" : "docker pull docker.elastic.co/logstash/logstash:5.4.3"
+                                          }
+
+                                  }                               
+                              },
+
+                              "startELK" : {
+                                  "commands" : {
+                                          "01_elastic" : {
+                                              "command" : "docker run  -p 9200:9200 -p 9300:9300 -itd -h elasticsearch --name elasticsearch docker.elastic.co/elasticsearch/elasticsearch:5.4.3"
+                                          },
+                                          "02_kibana" : {
+                                              "command" : "echo 'todavia nada"
+                                          },
+                                          "03_logstash" : {
+                                              "command" : "echo 'todavia nada' "
                                           }
 
                                   }                               
@@ -368,10 +393,10 @@
                   },
                   {
                   "IpProtocol" : "tcp",
-                  "FromPort" : "5000",  
-                  "ToPort" : "5000",
+                  "FromPort" : "80",  
+                  "ToPort" : "80",
                   "CidrIp" : "0.0.0.0/0"
-                  } 
+                  }
                 ]
 
               }
