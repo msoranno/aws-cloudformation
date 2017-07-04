@@ -241,7 +241,7 @@
             },
 
                 
-            "kubernetesMaster" : {
+            "ELKMaster" : {
               "Type" : "AWS::EC2::Instance",
               "DependsOn" : "GatewayToInternet",
               "Metadata" : {
@@ -249,22 +249,23 @@
                    "C2": "  La idea es que sirva de host bastionado. ",
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
-                                "PasosAseguir" : [ "configDockerRepo", "instalaApss", "configura", "pullELKimages", "startELK" ]
+                                "P1" : [ "configDockerRepo", "instalaApss", "configuraVarios", "configNginx_1", "configNginx_2"  ],
+                                "P2" : [ "configSelLinux"  , "startApss"  , "pullELKimages"  , "startELK"  ],
+                                "GO" : [ { "ConfigSet" : "P1" }, { "ConfigSet" : "P2" } ]
                               },
-
                               "configDockerRepo" : {
-                              	    "files" : {
-                    										"/etc/yum.repos.d/docker.repo" : {
-                    											    "content" : { "Fn::Join" : ["", [
-                    											      "[dockerrepo] \n",
-                    											      "name=Docker Repository \n",
-                    											      "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
-                    											      "enabled=1 \n",
-                    											      "gpgcheck=1 \n",
-                    											      "gpgkey=https://yum.dockerproject.org/gpg \n"
-                    											     ]]}
-										                    }
-									                  }
+                                  "files" : {
+                                      "/etc/yum.repos.d/docker.repo" : {
+                                        "content" : { "Fn::Join" : ["", [
+                                          "[dockerrepo] \n",
+                                          "name=Docker Repository \n",
+                                          "baseurl=https://yum.dockerproject.org/repo/main/centos/7/ \n",
+                                          "enabled=1 \n",
+                                          "gpgcheck=1 \n",
+                                          "gpgkey=https://yum.dockerproject.org/gpg \n"
+                                         ]]}
+                                      }
+                                  }
 
                               },
 
@@ -272,23 +273,15 @@
                                   "packages" : {
                                     "yum" : {
                                       "docker-engine" : [],
-                                      "git" : [],
                                       "wget" : [],
                                       "elinks": [],
                                       "nginx": [],
-                                      "vim": []
+                                      "git": []
                                      }
-                                  },
-                                  "services" :{
-                                      "sysvinit" : {
-                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"},
-                                        "nginx" : {"enabled" : "true", "ensureRunning" : "true"}
-                                      }
-
                                   }
                               },
 
-                              "configura" : {
+                              "configuraVarios" : {
                                   "commands" : {
                                           "01_ec2ToDodckergroup" : {
                                               "command" : "usermod -a -G docker centos"
@@ -298,6 +291,75 @@
                                           }
                                   }                               
                               },
+
+                              "configNginx_1" : {
+                                  "commands" : {
+                                          "01_renombraAntiguo" : {
+                                              "command" : "mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.old"
+                                          },
+                                          "02_siteAvailable" : {
+                                              "command" : "mkdir /etc/nginx/sites-availables"
+                                          },
+                                          "03_siteEnable" : {
+                                              "command" : "mkdir /etc/nginx/sites-enabled "
+                                          }
+                                  }                  
+
+                              },
+
+                              "configNginx_2" : {
+                                    "sources" : {
+                                      "/etc/nginx" : "https://s3.eu-west-2.amazonaws.com/mipiri.com/nginx.zip"
+                                    },
+
+                                    "commands" : {
+                                            "01_creaVhost" : {
+                                               "command": { "Fn::Join" : ["", [
+                                                 "v_file='/etc/nginx/sites-availables/default.conf' \n",
+                                                 "v_publicIP=`curl http://169.254.169.254/latest/meta-data/public-ipv4` \n",
+                                                 "echo 'upstream elastic {                       ' >> $v_file \n",
+                                                 "echo 'server localhost:9200;                   ' >> $v_file \n",
+                                                 "echo '}                                        ' >> $v_file \n",
+                                                 "echo 'server {                                 ' >> $v_file \n",
+                                                 "echo 'listen *:80;                             ' >> $v_file \n",
+                                                 "echo \"server_name $v_publicIP             ;  \" >> $v_file \n",
+                                                 "echo 'access_log /var/log/nginx/elastic.log;   ' >> $v_file \n",
+                                                 "echo 'error_log /var/log/nginx/elastic.log;    ' >> $v_file \n",
+                                                 "echo 'location / {                             ' >> $v_file \n",
+                                                 "echo 'proxy_pass http://elastic;               ' >> $v_file \n",
+                                                 "echo '}                                        ' >> $v_file \n",
+                                                 "echo '}                                        ' >> $v_file   "                                       
+
+                                               ]]}
+                                            },
+                                            "02_enlaceSimbolico" : {
+                                                "command" : "ln -s /etc/nginx/sites-availables/default.conf /etc/nginx/sites-enabled/default.conf"
+                                            },
+                                            "03_seguridad" : {
+                                                "command" : "chmod 666 /etc/nginx/nginx.conf"
+                                            }
+                                    }                  
+                              },
+
+                              "configSelLinux" : {
+                                  "commands" : {
+                                          "01_p9200" : {
+                                              "command" : "semanage port -a -t http_port_t  -p tcp 9200"
+                                          },
+                                          "02_p9300" :{
+                                              "command" : "semanage port -a -t http_port_t  -p tcp 9300"
+                                          }
+                                  }                  
+                              },
+
+                              "startApss" : {
+                                  "services" :{
+                                      "sysvinit" : {
+                                        "docker" : {"enabled" : "true", "ensureRunning" : "true"},
+                                        "nginx" : {"enabled" : "true", "ensureRunning" : "true"}
+                                      }
+                                  }
+                             },
 
                               "pullELKimages" : {
                                   "commands" : {
@@ -310,7 +372,6 @@
                                           "03_logstash" : {
                                               "command" : "docker pull docker.elastic.co/logstash/logstash:5.4.3"
                                           }
-
                                   }                               
                               },
 
@@ -320,7 +381,7 @@
                                               "command" : "docker run  -p 9200:9200 -p 9300:9300 -itd -h elasticsearch --name elasticsearch docker.elastic.co/elasticsearch/elasticsearch:5.4.3"
                                           },
                                           "02_kibana" : {
-                                              "command" : "echo 'todavia nada"
+                                              "command" : "echo 'todavia nada'"
                                           },
                                           "03_logstash" : {
                                               "command" : "echo 'todavia nada' "
@@ -372,8 +433,8 @@
                     "#Install the files and packages from the metadata\n",
                     "/opt/aws/bin/cfn-init -v ",
                     "         --stack ", { "Ref" : "AWS::StackName" },
-                    "         --resource kubernetesMaster ",
-                    "         --configsets PasosAseguir ",
+                    "         --resource ELKMaster ",
+                    "         --configsets GO ",
                     "         --region ", { "Ref" : "AWS::Region" }, "\n"
                 ]]}}                
               }
@@ -415,8 +476,14 @@
             },
             "DNSName" : {
               "Description" : "DNS Name of the EC2 host",
-              "Value" :  { "Fn::GetAtt" : ["kubernetesMaster", "PublicDnsName"] }
+              "Value" :  { "Fn::GetAtt" : ["ELKMaster", "PublicDnsName"] }
+            },
+            "IpPublica" : {
+              "Description" : "Ip publica del  EC2 host",
+              "Value" :  { "Fn::GetAtt" : ["ELKMaster", "PublicIp"] }
             }
     }
  
 }
+
+
