@@ -250,7 +250,7 @@
                    "AWS::CloudFormation::Init" : {
                               "configSets" : {
                                 "P1" : [ "configDockerRepo", "instalaApss", "configuraVarios", "configNginx_1", "configNginx_2"  ],
-                                "P2" : [ "configSelLinux"  , "startApss"  , "pullELKimages"  , "startELK"  ],
+                                "P2" : [ "configSelLinux"  , "startApss"  , "pullELKimages"  , "antesDearrancar","startELK"  ],
                                 "GO" : [ { "ConfigSet" : "P1" }, { "ConfigSet" : "P2" } ]
                               },
                               "configDockerRepo" : {
@@ -317,8 +317,10 @@
                                                "command": { "Fn::Join" : ["", [
                                                  "v_file='/etc/nginx/sites-availables/default.conf' \n",
                                                  "v_publicIP=`curl http://169.254.169.254/latest/meta-data/public-ipv4` \n",
+                                                 "echo '#---------------------------------------------------------------------------' >> $v_file \n",
                                                  "echo '#Esta es la configuracion para hacer llamadas a elasticsearch o Kibana por  ' >> $v_file \n",
                                                  "echo '#separado /elastic y /app/kibana                                            ' >> $v_file \n",
+                                                 "echo '#---------------------------------------------------------------------------' >> $v_file \n",
                                                  "echo 'upstream elastic {                                                          ' >> $v_file \n",
                                                  "echo '   server localhost:9200;                                                   ' >> $v_file \n",
                                                  "echo '}                                                                           ' >> $v_file \n",
@@ -330,6 +332,12 @@
                                                  "echo '  location /elastic {                                                       ' >> $v_file \n",
                                                  "echo '    proxy_pass http://elastic/;                                             ' >> $v_file \n",
                                                  "echo '  }                                                                         ' >> $v_file \n",
+                                                 "echo '#---------------------------------------------------------------------------' >> $v_file \n",
+                                                 "echo '# La location del Kibana deshabilita el poder llamar al elastic como        ' >> $v_file \n",
+                                                 "echo '# /elastic, pero da igual por que con kibana no nos hace falta pegarle      ' >> $v_file \n",
+                                                 "echo '# al elastic por si solo. De todas formas siempre podemos acceder vía curl  ' >> $v_file \n",
+                                                 "echo '# desde la propia maquina  ' >> $v_file \n",
+                                                 "echo '#---------------------------------------------------------------------------' >> $v_file \n",
                                                  "echo '  location ~ (|/app/kibana|/bundles/|/status|/plugins|/elasticsearch/|)  {  ' >> $v_file \n",
                                                  "echo '     proxy_pass http://localhost:5601;                                      ' >> $v_file \n",
                                                  "echo '     proxy_http_version 1.1;                                                ' >> $v_file \n",
@@ -390,6 +398,17 @@
                                   }                               
                               },
 
+                              "antesDearrancar" : {
+                                  "commands" : {
+                                          "01_clonamos" : {
+                                              "command" : "git clone https://github.com/msoranno/logstash.git /home/centos/logstash"
+                                          },
+                                          "02_seguridad" : {
+                                              "command" : "chown -R centos:centos /home/centos/logstash"
+                                          }
+                                  }                               
+                              },
+
                               "startELK" : {
                                   "commands" : {
                                           "01_elastic" : {
@@ -399,7 +418,7 @@
                                               "command" : "docker run  -p 5601:5601 -itd -h kibana --name kibana --link elasticsearch:elasticsearch docker.elastic.co/kibana/kibana:5.4.3"
                                           },
                                           "03_logstash" : {
-                                              "command" : "echo 'todavia nada' "
+                                              "command" : "docker run -h logstash --name logstash --link elasticsearch:elasticsearch -itd --rm -v /home/centos/logstash:/config-dir docker.elastic.co/logstash/logstash:5.4.3 -f /config-dir/logstash.conf"
                                           }
 
                                   }                               
