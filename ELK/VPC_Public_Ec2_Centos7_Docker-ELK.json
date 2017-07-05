@@ -433,7 +433,7 @@
                    {
                       "DeviceName" : "/dev/sda1",
                       "Ebs" : { 
-                        "VolumeSize" : "10",
+                        "VolumeSize" : "20",
                         "DeleteOnTermination" : "true"
                       }
                    }
