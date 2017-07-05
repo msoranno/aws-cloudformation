@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Stack de ELK Es para crear un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) cuyo securityGroup permite acceso por el 22 y el 5000. En el Ec2 se instala manualmente los helper scripts y se configura docker, ademas, descargamos una app docker por el puerto 5000 para verificar que todo esta ok. Tambien se crea un disco EBS de 10G que se autodestruye.",
+  "Description" : "Stack de ELK. Crea un VPC, SubnetPublica,  y un EC2 (centos 7 ami-addd7ac2 ) . SecurityGroup (22 y 80). EC2 (docker, nginx, logstah-Kibana-elastic dockerizado en su propio contenedor)",
     
     "Parameters" : {
 
@@ -313,28 +313,40 @@
                                     },
 
                                     "commands" : {
-                                            "01_creaVhost" : {
+                                            "01_creaVhostElasticKibana" : {
                                                "command": { "Fn::Join" : ["", [
                                                  "v_file='/etc/nginx/sites-availables/default.conf' \n",
                                                  "v_publicIP=`curl http://169.254.169.254/latest/meta-data/public-ipv4` \n",
-                                                 "echo 'upstream elastic {                       ' >> $v_file \n",
-                                                 "echo 'server localhost:9200;                   ' >> $v_file \n",
-                                                 "echo '}                                        ' >> $v_file \n",
-                                                 "echo 'server {                                 ' >> $v_file \n",
-                                                 "echo 'listen *:80;                             ' >> $v_file \n",
-                                                 "echo \"server_name $v_publicIP             ;  \" >> $v_file \n",
-                                                 "echo 'access_log /var/log/nginx/elastic.log;   ' >> $v_file \n",
-                                                 "echo 'error_log /var/log/nginx/elastic.log;    ' >> $v_file \n",
-                                                 "echo 'location / {                             ' >> $v_file \n",
-                                                 "echo 'proxy_pass http://elastic;               ' >> $v_file \n",
-                                                 "echo '}                                        ' >> $v_file \n",
-                                                 "echo '}                                        ' >> $v_file   "                                       
+                                                 "echo '#Esta es la configuracion para hacer llamadas a elasticsearch o Kibana por  ' >> $v_file \n",
+                                                 "echo '#separado /elastic y /app/kibana                                            ' >> $v_file \n",
+                                                 "echo 'upstream elastic {                                                          ' >> $v_file \n",
+                                                 "echo '   server localhost:9200;                                                   ' >> $v_file \n",
+                                                 "echo '}                                                                           ' >> $v_file \n",
+                                                 "echo 'server {                                                                    ' >> $v_file \n",
+                                                 "echo '  listen *:80;                                                              ' >> $v_file \n",
+                                                 "echo \" server_name $v_publicIP             ;                                    \" >> $v_file \n",
+                                                 "echo '  access_log /var/log/nginx/elastic.log;                                    ' >> $v_file \n",
+                                                 "echo '  error_log /var/log/nginx/elastic.log;                                     ' >> $v_file \n",
+                                                 "echo '  location / {                                                              ' >> $v_file \n",
+                                                 "echo '    proxy_pass http://elastic/;                                             ' >> $v_file \n",
+                                                 "echo '  }                                                                         ' >> $v_file \n",
+                                                 "echo '  location ~ (|/app/kibana|/bundles/|/status|/plugins|/elasticsearch/|)  {  ' >> $v_file \n",
+                                                 "echo '     proxy_pass http://localhost:5601;                                      ' >> $v_file \n",
+                                                 "echo '     proxy_http_version 1.1;                                                ' >> $v_file \n",
+                                                 "echo '     proxy_set_header Upgrade $http_upgrade;                                ' >> $v_file \n",
+                                                 "echo '     proxy_set_header Connection \"upgrade\";                               ' >> $v_file \n",
+                                                 "echo '     proxy_set_header Host $host;                                           ' >> $v_file \n",
+                                                 "echo '     rewrite /(.*)$ /$1 break;                                              ' >> $v_file \n",
+                                                 "echo '  }                                                                         ' >> $v_file \n"
+                                                 "echo '}                                                                           ' >> $v_file \n",
 
                                                ]]}
                                             },
+
                                             "02_enlaceSimbolico" : {
                                                 "command" : "ln -s /etc/nginx/sites-availables/default.conf /etc/nginx/sites-enabled/default.conf"
                                             },
+
                                             "03_seguridad" : {
                                                 "command" : "chmod 666 /etc/nginx/nginx.conf"
                                             }
@@ -343,11 +355,14 @@
 
                               "configSelLinux" : {
                                   "commands" : {
-                                          "01_p9200" : {
+                                          "01_p9200Elastic" : {
                                               "command" : "semanage port -a -t http_port_t  -p tcp 9200"
                                           },
-                                          "02_p9300" :{
+                                          "02_p9300Elastic" :{
                                               "command" : "semanage port -a -t http_port_t  -p tcp 9300"
+                                          },
+                                          "02_p5601Kibana" :{
+                                              "command" : "semanage port -a -t http_port_t  -p tcp 5601"
                                           }
                                   }                  
                               },
@@ -381,7 +396,7 @@
                                               "command" : "docker run  -p 9200:9200 -p 9300:9300 -itd -h elasticsearch --name elasticsearch docker.elastic.co/elasticsearch/elasticsearch:5.4.3"
                                           },
                                           "02_kibana" : {
-                                              "command" : "echo 'todavia nada'"
+                                              "command" : "docker run  -p 5601:5601 -itd -h kibana --name kibana --link elasticsearch:elasticsearch docker.elastic.co/kibana/kibana:5.4.3"
                                           },
                                           "03_logstash" : {
                                               "command" : "echo 'todavia nada' "
