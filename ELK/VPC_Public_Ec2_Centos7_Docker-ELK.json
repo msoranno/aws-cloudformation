@@ -327,7 +327,7 @@
                                                  "echo \" server_name $v_publicIP             ;                                    \" >> $v_file \n",
                                                  "echo '  access_log /var/log/nginx/elastic.log;                                    ' >> $v_file \n",
                                                  "echo '  error_log /var/log/nginx/elastic.log;                                     ' >> $v_file \n",
-                                                 "echo '  location / {                                                              ' >> $v_file \n",
+                                                 "echo '  location /elastic {                                                       ' >> $v_file \n",
                                                  "echo '    proxy_pass http://elastic/;                                             ' >> $v_file \n",
                                                  "echo '  }                                                                         ' >> $v_file \n",
                                                  "echo '  location ~ (|/app/kibana|/bundles/|/status|/plugins|/elasticsearch/|)  {  ' >> $v_file \n",
