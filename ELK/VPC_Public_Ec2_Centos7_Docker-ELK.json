@@ -337,8 +337,8 @@
                                                  "echo '     proxy_set_header Connection \"upgrade\";                               ' >> $v_file \n",
                                                  "echo '     proxy_set_header Host $host;                                           ' >> $v_file \n",
                                                  "echo '     rewrite /(.*)$ /$1 break;                                              ' >> $v_file \n",
-                                                 "echo '  }                                                                         ' >> $v_file \n"
-                                                 "echo '}                                                                           ' >> $v_file \n",
+                                                 "echo '  }                                                                         ' >> $v_file \n",
+                                                 "echo '}                                                                           ' >> $v_file \n"
 
                                                ]]}
                                             },
