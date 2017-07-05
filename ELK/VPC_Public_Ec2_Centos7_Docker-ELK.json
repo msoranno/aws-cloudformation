@@ -418,7 +418,7 @@
                                               "command" : "docker run  -p 5601:5601 -itd -h kibana --name kibana --link elasticsearch:elasticsearch docker.elastic.co/kibana/kibana:5.4.3"
                                           },
                                           "03_logstash" : {
-                                              "command" : "docker run -h logstash --name logstash --link elasticsearch:elasticsearch -itd --rm -v /home/centos/logstash:/config-dir docker.elastic.co/logstash/logstash:5.4.3 -f /config-dir/logstash.conf"
+                                              "command" : "docker run -h logstash --name logstash --link elasticsearch:elasticsearch -itd --rm -v /home/centos/logstash:/config-dir docker.elastic.co/logstash/logstash:5.4.3 -f /config-dir/logstash.conf -l /var/log/logstash.log"
                                           }
 
                                   }                               
