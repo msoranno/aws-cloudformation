@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Cloud Formation for supporting openshift installation.
+
+Parameters:
+  KeyName:
+    Description: The EC2 Key Pair to allow SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+  AvailabilityZone:
+    Description: Availability zone to deploy
+    Type: AWS::EC2::AvailabilityZone::Name
+
+Mappings:
+  RegionMap:
+    eu-central-1:
+      CentOS7: "ami-337be65c"
+
+Resources:
+  ocVPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: 10.0.0.0/28
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: openshift-cf-vpc
+  #---
+  # Subnets end Route tables
+  #---
+  publicIG:
+    Type: AWS::EC2::InternetGateway
+
+  publicIGAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref publicIG
+      VpcId: !Ref ocVPC
+
+  publicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref ocVPC
+      CidrBlock: 10.0.0.0/28
+      AvailabilityZone: !Ref AvailabilityZone
+
+  publicroutetable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref ocVPC
+
+  publicSubnetRouteAssociate:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+     RouteTableId: !Ref publicroutetable
+     SubnetId: !Ref publicSubnet
+
+  route:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref publicIG
+
+  #---
+  # EC2 instances 
+  #---
+  ec2OcMaster:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      Tags:
+      - Key: Name
+        Value: openshift-master
+      InstanceType: t2.large
+      KeyName: !Ref KeyName
+      AvailabilityZone: !Ref AvailabilityZone
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref publicSubnet
+          GroupSet:
+             - !Ref masterSecGroup
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", CentOS7]
+
+  ec2OcNode1:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      Tags:
+      - Key: Name
+        Value: openshift-worker1
+      InstanceType: t2.medium
+      KeyName: !Ref KeyName
+      AvailabilityZone: !Ref AvailabilityZone
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref publicSubnet
+          GroupSet:
+             - !Ref nodesSecGroup
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", CentOS7]
+
+  ec2OcNode2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      Tags:
+      - Key: Name
+        Value: openshift-worker2
+      InstanceType: t2.medium
+      KeyName: !Ref KeyName
+      AvailabilityZone: !Ref AvailabilityZone
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref publicSubnet
+          GroupSet:
+           - !Ref nodesSecGroup
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", CentOS7]
+  
+
+  #---
+  # EBS for the Master
+  #---
+  ebsMaster:
+    Type: 'AWS::EC2::Volume'
+    Properties:
+      AvailabilityZone: !GetAtt ec2OcMaster.AvailabilityZone
+      Size: 50
+    DeletionPolicy: Delete
+
+  ebsMasterAttach:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: '/dev/xvdb'
+      VolumeId: !Ref ebsMaster
+      InstanceId: !Ref ec2OcMaster
+
+  #---
+  # EBS for the Node1
+  #---
+  ebsNode1:
+    Type: 'AWS::EC2::Volume'
+    Properties:
+      AvailabilityZone: !GetAtt ec2OcNode1.AvailabilityZone
+      Size: 50
+    DeletionPolicy: Delete
+
+  ebsNode1Attach:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: '/dev/xvdb'
+      VolumeId: !Ref ebsNode1
+      InstanceId: !Ref ec2OcNode1
+
+  #---
+  # EBS for the Node2
+  #---
+
+  ebsNode2:
+    Type: 'AWS::EC2::Volume'
+    Properties:
+      AvailabilityZone: !GetAtt ec2OcNode1.AvailabilityZone
+      Size: 50
+    DeletionPolicy: Delete
+
+  ebsNode2Attach:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: '/dev/xvdb'
+      VolumeId: !Ref ebsNode2
+      InstanceId: !Ref ec2OcNode2
+
+  #---
+  # Security Groups used for all nodes.
+  #---
+  nodesSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref ocVPC
+      GroupDescription: Security group for the worker Kubernetes nodes
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 10.0.0.0/28
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+
+  #---
+  # Security Group for the Master
+  #---
+  masterSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref ocVPC
+      GroupDescription: Security group for the master Kubernetes node
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 10.0.0.0/28
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '8443'
+        ToPort: '8443'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '10250'
+        ToPort: '10250'
+        CidrIp: 0.0.0.0/0
