@@ -131,7 +131,12 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           echo "userdate its here" > /home/centos/userdata.txt
-          yum update -y aws-cfn-bootstrap
+          yum update -y
+          yum install -y epel-release
+          yum install -y awscli
+          /usr/bin/easy_install --script-dir /opt/aws/bin https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d
+          chmod +x /etc/init.d/cfn-hup
           /opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}
   ec2OcNode1:
     Type: 'AWS::EC2::Instance'
