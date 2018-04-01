@@ -12,6 +12,7 @@ Parameters:
   ElasticIP:
     Description: ElasticIP to be associated to the master
     Type: String
+    Default: 2.2.2.2
 
 Mappings:
   RegionMap:
@@ -73,10 +74,8 @@ Resources:
     Type: "AWS::EC2::EIPAssociation"
     Properties:
       InstanceId: !Ref ec2OcMaster
-      EIP: ElasticIP
-
-
-
+      EIP:
+        Ref: ElasticIP
   #---
   # EC2 instances 
   #---
@@ -130,10 +129,10 @@ Resources:
       ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", CentOS7]
       UserData:
         Fn::Base64: !Sub |
-           #!/bin/bash -xe
-           yum update -y aws-cfn-bootstrap
-           /opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}
-
+          #!/bin/bash
+          echo "userdate its here" > /home/centos/userdata.txt
+          yum update -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}
   ec2OcNode1:
     Type: 'AWS::EC2::Instance'
     Properties:
