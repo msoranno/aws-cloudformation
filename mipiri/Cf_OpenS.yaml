@@ -67,6 +67,38 @@ Resources:
   #---
   ec2OcMaster:
     Type: 'AWS::EC2::Instance'
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          Steps:
+            - "dockerRepo"
+            - "dependencies"
+            - "varios"
+        dockerRepo:
+          files:
+            /etc/yum.repos.d/docker.repo:
+              content: !Sub | 
+                  [dockerrepo] 
+                  name=Docker Repository 
+                  baseurl=https://yum.dockerproject.org/repo/main/centos/7/ 
+                  enabled=1
+                  gpgcheck=1 
+                  gpgkey=https://yum.dockerproject.org/gpg 
+              mode: "000644"
+              owner: "root"
+              group: "root"              
+        dependencies: 
+          packages:
+            yum:
+              - "git" 
+              - "docker-engine"
+              - "wget"
+              - "elinks"
+        varios: 
+         commands: 
+           01_dockerGroup: 
+            command: "usermod -a -G docker centos"
+
     Properties:
       Tags:
       - Key: Name
@@ -81,6 +113,11 @@ Resources:
           GroupSet:
              - !Ref masterSecGroup
       ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", CentOS7]
+      UserData:
+        Fn::Base64: !Sub |
+           #!/bin/bash -xe
+           yum update -y aws-cfn-bootstrap
+           /opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}
 
   ec2OcNode1:
     Type: 'AWS::EC2::Instance'
@@ -212,3 +249,15 @@ Resources:
         FromPort: '10250'
         ToPort: '10250'
         CidrIp: 0.0.0.0/0
+  #---
+  # Some Outputs
+  #---
+Outputs:
+  StackVPC:
+    Description: The ID of the VPC
+    Value: !Ref ocVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  dnsMaster:
+    Description: Openshift Master
+    Value: !GetAtt ec2OcMaster.PublicDnsName
