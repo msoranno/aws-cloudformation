@@ -85,10 +85,11 @@ Resources:
       AWS::CloudFormation::Init:
         configSets:
           Steps:
-            - "dockerRepo"
-            - "update"
-            - "dependencies"
-            - "varios"
+          - "dockerRepo"
+          - "update"
+          - "dependencies"
+          - "varios"
+        
         dockerRepo:
           files:
             /etc/yum.repos.d/docker.repo:
@@ -102,17 +103,24 @@ Resources:
               mode: "000644"
               owner: "root"
               group: "root"              
+        
         update: 
          commands: 
-           01_dockerGroup: 
+           01_update: 
             command: "yum update -y"
+        
         dependencies: 
           packages:
             yum:
-              - "git" 
-              - "docker-engine"
-              - "wget"
-              - "elinks"
+              git: [] 
+              docker-engine: []
+              wget: []
+              elinks: []
+          services: 
+            sysvinit: 
+              docker:  #Mantenemos el docker arrancado.
+                enabled: "true"
+                ensureRunning: "true"              
         varios: 
          commands: 
            01_dockerGroup: 
@@ -135,7 +143,8 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          echo "userdate its here" > /home/centos/userdata.txt
+          set -x
+          echo "/opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}" >> /home/centos/userdata.txt
           yum update -y
           yum install -y epel-release
           yum install -y awscli
@@ -143,7 +152,6 @@ Resources:
           cp -v /usr/lib/python2*/site-packages/aws_cfn_bootstrap*/init/redhat/cfn-hup /etc/init.d
           chmod +x /etc/init.d/cfn-hup
           yum update -y
-          echo "/opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}" >> /home/centos/userdata.txt
           /opt/aws/bin/cfn-init -v --configsets Steps --stack ${AWS::StackName} --resource ec2OcMaster --region ${AWS::Region}
   ec2OcNode1:
     Type: 'AWS::EC2::Instance'

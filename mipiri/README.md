@@ -22,3 +22,7 @@
 		  [profile myprofile]
 		  output = json
 		  region = eu-central-1
+
+	### Pending
+		- revisar el tema del block storage.
+		http://docs.platform9.com/support/preparing-centos-7-system-running-containers/
