@@ -8,13 +8,15 @@ if [ "$#" -eq 2 ]; then
 	v_templateFile='Cf_OpenS.yaml'
 	v_key='key_08062017'
 	v_AvailabilityZone='eu-central-1b'
+	v_ElasticIP='18.184.19.84'
 
 	if [ "$action" == "create" ] || [ "$action" == "update" ]; then
 		aws cloudformation --profile $profile $action-stack --stack-name $v_stackName \
 		--template-body file://$v_templateFile \
 		--parameters \
 			ParameterKey=KeyName,ParameterValue=$v_key \
-			ParameterKey=AvailabilityZone,ParameterValue=$v_AvailabilityZone
+			ParameterKey=AvailabilityZone,ParameterValue=$v_AvailabilityZone \
+			ParameterKey=ElasticIP,ParameterValue=$v_ElasticIP
 	fi
 	
 
